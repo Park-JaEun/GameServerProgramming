@@ -105,7 +105,6 @@ int main(int argc, char* argv[]) {
 
     char buf[4096];
     char key;
-    int x = 0, y = 0; // 말의 초기 위치
 
     initializeBoard();
     printBoard();
@@ -117,7 +116,7 @@ int main(int argc, char* argv[]) {
 
         if (sizeof(key) > 0) {
             // 서버에 키 입력 보내기
-            int sendResult = send(sock, &key, sizeof(key), 0);
+            int sendResult = send(sock, &key, sizeof(key), 0);  
 
             // 서버로부터 응답 받기
             if (sendResult != SOCKET_ERROR) {
