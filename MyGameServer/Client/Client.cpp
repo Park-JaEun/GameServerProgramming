@@ -76,7 +76,7 @@ void printBoard()
     }
 }
 
-int main(int argc, char* argv[]) 
+int main(int argc, char* argv[])
 {
 
     char buf[BUFSIZE];
@@ -88,7 +88,7 @@ int main(int argc, char* argv[])
 
     //cout << "IP 주소 입력 : ";
 
-    
+
     std::wcout.imbue(std::locale("korean"));    // 에러 메세지 한글로
 
     WSADATA WSAData;
@@ -129,7 +129,7 @@ int main(int argc, char* argv[])
         DWORD recv_flag = 0;
         WSARecv(server_s, wsabuf, 1, &recv_size, &recv_flag, nullptr, nullptr);
 
-        cout << buf  << endl;
+        cout << buf << endl;
 
         // 서버로부터 받은 새로운 위치 정보로 말 이동 코드
         movePiece(x, y, buf);
@@ -141,5 +141,5 @@ int main(int argc, char* argv[])
     WSACleanup();
 
 
-  
+
 }
