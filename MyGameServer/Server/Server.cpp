@@ -1,11 +1,12 @@
 // server.cpp
 #include <iostream>
-#include <WS2tcpip.h>
 #include <string>
+#include <WS2tcpip.h>		// 이 라이브러리가 표준 함수들과 충돌하니까 useing namespace std; 를 사용하지 않는다.
+#pragma comment(lib, "WS2_32.LIB")	// 이 라이브러리를 사용하겠다고 선언한다.
 
-#pragma comment (lib, "ws2_32.lib")
+constexpr short PORT = 4000;
+constexpr int BUFSIZE = 256;
 
-using namespace std;
 
 const int BOARDSIZE = 8;
 int board[BOARDSIZE][BOARDSIZE]; // 체스판 데이터
@@ -44,74 +45,73 @@ void updateBoard(char key) {
     }
 
     board[y][x] = 0; // 새 위치에 Pawn 설정
-    cout<< "Pawn 위치: " << x+1 << ", " << y+1 << endl;
+    std::cout<< "Pawn 위치: " << x+1 << ", " << y+1 << std::endl;
+}
+
+
+void print_error(const char* msg, int err_no)
+{
+    WCHAR* msg_buf;
+    FormatMessage(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM,
+        NULL, err_no,
+        MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
+        reinterpret_cast<LPWSTR>(&msg_buf), 0, NULL);
+    std::cout << msg;
+    std::wcout << L" : 에러 : " << msg_buf;
+    LocalFree(msg_buf);
+    while (true);   // 편안하게 디버깅 가능하도록 하는 코드, 실제 프로그램에서는 빼야 함
+    return;
 }
 
 int main() {
-    WSADATA wsData;
-    WSAStartup(MAKEWORD(2, 2), &wsData);
+    std::wcout.imbue(std::locale("korean"));		// 에러 메세지 한글로
 
-    SOCKET listening = socket(AF_INET, SOCK_STREAM, 0);
-    if (listening == INVALID_SOCKET) {
-        cerr << "Can't create a socket! Quitting" << endl;
-        return 1;
-    }
+    WSADATA WSAData;
+    WSAStartup(MAKEWORD(2, 0), &WSAData);		// 윈도우에서만 필요한 코드	
 
-    sockaddr_in hint;
-    hint.sin_family = AF_INET;
-    hint.sin_port = htons(54000); // Port 번호
-    hint.sin_addr.S_un.S_addr = INADDR_ANY; // 모든 인터페이스에서 수신
+    SOCKET server_s = WSASocket(AF_INET, SOCK_STREAM, IPPROTO_TCP, nullptr, 0, 0);
+    SOCKADDR_IN server_a;
+    server_a.sin_family = AF_INET;
+    server_a.sin_port = htons(PORT);						// 다른 프로그램과 충돌하지 않는 숫자로 설정해야 함
+    server_a.sin_addr.S_un.S_addr = htonl(INADDR_ANY);	// 서버에서는 이렇게 설정해야 한다.
 
-    bind(listening, (sockaddr*)&hint, sizeof(hint));
-    listen(listening, SOMAXCONN);
+    bind(server_s, reinterpret_cast<SOCKADDR*>(&server_a), sizeof(server_a));
+    listen(server_s, SOMAXCONN);	// SOMAXCONN은 최대 연결 수
 
-    sockaddr_in client;
-    int clientSize = sizeof(client);
+   
+    int addr_size = sizeof(server_a);
+    SOCKET client_s = WSAAccept(server_s, reinterpret_cast<SOCKADDR*>(&server_a), &addr_size, nullptr, 0);
 
-    SOCKET clientSocket = accept(listening, (sockaddr*)&client, &clientSize);
-    if (clientSocket == INVALID_SOCKET) {
-        cerr << "Can't accept client! Quitting" << endl;
-        return 1;
-    }
+    initializeBoard();      // 체스판 초기화
 
-    char host[NI_MAXHOST];
-    char service[NI_MAXSERV];
-
-    ZeroMemory(host, NI_MAXHOST); // 같은 것으로 memset(host, 0, NI_MAXHOST);
-    ZeroMemory(service, NI_MAXSERV);
-
-    if (getnameinfo((sockaddr*)&client, sizeof(client), host, NI_MAXHOST, service, NI_MAXSERV, 0) == 0) {
-        cout << host << " connected on port " << service << endl;
-    }
-    else {
-        inet_ntop(AF_INET, &client.sin_addr, host, NI_MAXHOST);
-        cout << host << " connected on port " << ntohs(client.sin_port) << endl;
-    }
-
-    closesocket(listening);
-
-    initializeBoard();
-
-    char buf[4096];
     while (true) {
-        ZeroMemory(buf, 4096);
-        int bytesReceived = recv(clientSocket, buf, 4096, 0);
-        if (bytesReceived == SOCKET_ERROR) {
-            cerr << "Error in recv(). Quitting" << endl;
-            break;
+        char buf[BUFSIZE];
+
+        WSABUF wsabuf[1];
+        wsabuf[0].buf = buf;
+        wsabuf[0].len = BUFSIZE;	// 일단 크게
+        DWORD recv_size;
+        DWORD recv_flag = 0;
+        int res = WSARecv(client_s, wsabuf, 1, &recv_size, &recv_flag, nullptr, nullptr);
+        if (0 != res) {
+            print_error("WSARecv", WSAGetLastError());
         }
-        if (bytesReceived == 0) {
-            cout << "Client disconnected " << endl;
+        if (recv_size == 0)
             break;
-        }
 
         updateBoard(buf[0]); // 말 위치 업데이트
 
-        // 변경된 말의 위치를 클라이언트에 전송
-        string position = to_string(x) + " " + to_string(y);
-        send(clientSocket, position.c_str(), position.size() + 1, 0);
-    }
+        // Pawn 위치 전송
+        std::string position = std::to_string(x) + " " + std::to_string(y);
+        wsabuf[0].buf = const_cast<char*>(position.c_str());
+        wsabuf[0].len = position.length() + 1;
+        DWORD sent_size;
+        //std::cout << wsabuf[0].buf << std::endl;
 
-    closesocket(clientSocket);
+        WSASend(client_s, wsabuf, 1, &sent_size, 0, nullptr, nullptr);
+    }
+    closesocket(client_s);
+    closesocket(server_s);
+
     WSACleanup();
 }
