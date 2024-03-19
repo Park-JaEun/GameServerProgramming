@@ -7,7 +7,7 @@
 
 constexpr short PORT = 4000;
 constexpr int BUFSIZE = 256;
-constexpr char SERVER_ADDR[] = "127.0.0.1";
+//constexpr char SERVER_ADDR[] = "127.0.0.1";
 
 
 const int BOARDSIZE = 8;
@@ -81,12 +81,13 @@ int main(int argc, char* argv[])
 
     char buf[BUFSIZE];
     char key;
+    char SERVER_ADDR[BUFSIZE];
+
+    cout << "IP 주소 입력 : ";
+    cin >> SERVER_ADDR;
 
     initializeBoard();
     printBoard();
-
-
-    //cout << "IP 주소 입력 : ";
 
 
     std::wcout.imbue(std::locale("korean"));    // 에러 메세지 한글로
