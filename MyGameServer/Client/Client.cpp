@@ -1,146 +1,185 @@
-#define _CRT_SECURE_NO_WARNINGS
 #include <iostream>
-#include <conio.h> 
-#include <string>
-#include <WS2tcpip.h>		// 이 라이브러리가 표준 함수들과 충돌하니까 useing namespace std; 를 사용하지 않는다.
-#pragma comment(lib, "WS2_32.LIB")	// 이 라이브러리를 사용하겠다고 선언한다.
+#include <WS2tcpip.h>
+#include <conio.h>
+#pragma comment (lib, "WS2_32.LIB")
 
 constexpr short PORT = 4000;
+constexpr char SERVER_ADDR[] = "127.0.0.1";
 constexpr int BUFSIZE = 256;
-//constexpr char SERVER_ADDR[] = "127.0.0.1";
-
 
 const int BOARDSIZE = 8;
-int board[BOARDSIZE][BOARDSIZE]; // 체스판 데이터
-int x = 0, y = 0; // 처음 Pawn 위치
 
-using namespace std;
+int board[BOARDSIZE][BOARDSIZE];
+int x = 0;
+int y = 0;
+int Pawn[10][2]= { -1, };		// id, 좌표
+bool isf = true;
 
-void movePiece(int& x, int& y, const string& newPosition) {
+bool bshutdown = false;
+SOCKET server_s;
+WSABUF wsabuf[1];
+char buf[BUFSIZE];
+WSAOVERLAPPED wsaover;
+void CALLBACK send_callback(DWORD, DWORD, LPWSAOVERLAPPED, DWORD);
 
-    board[y][x] = ((y + x) % 2 == 0) ? -1 : 1;    // 기존 Pawn 위치 초기화
-
-    int newX, newY;
-
-    sscanf(newPosition.c_str(), "%d %d", &newX, &newY);	// 새 위치 받아오기
-    x = newX;
-    y = newY;
-
-    board[y][x] = 0;    // 새 위치에 Pawn 설정
-}
+void initializeBoard();
+void printBoard();
+void updateKey(char key);
 
 // 체스판 초기화하는 함수
 void initializeBoard()
 {
-    for (int i = 0; i < BOARDSIZE; ++i) {
-        for (int j = 0; j < BOARDSIZE; ++j) {
-            // 검은색과 흰색 칸 번갈아가며 초기화
-            if ((i + j) % 2 == 0) {
-                board[i][j] = -1; // 흰색 칸
-            }
-            else {
-                board[i][j] = 1; // 검은색 칸
-            }
-        }
-    }
-
-    // Pawn 초기 위치
-    board[y][x] = 0;
-
+	for (int i = 0; i < BOARDSIZE; ++i) {
+		for (int j = 0; j < BOARDSIZE; ++j) {
+			// 검은색과 흰색 칸 번갈아가며 초기화
+			if ((i + j) % 2 == 0) {
+				board[i][j] = -3; // 흰색 칸
+			}
+			else {
+				board[i][j] = -1; // 검은색 칸
+			}
+		}
+	}
+	// Pawn 초기 위치
+	//board[y][x] = 0;
 }
+
+
 
 // 체스판 출력하는 함수
 void printBoard()
 {
-    system("cls"); // 콘솔 클리어
+	system("cls"); // 콘솔 클리어
 
-    for (int i = 0; i < BOARDSIZE; ++i) {
-        for (int j = 0; j < BOARDSIZE; ++j) {
-            switch (board[i][j])
-            {
-            case 1:
-                cout << " ■ ";
-                break;
-            case -1:
-                cout << " □ ";
-                break;
-            case 0:
-                cout << " ♣ ";
-                break;
+	for (int i = 0; i < BOARDSIZE; ++i) {
+		for (int j = 0; j < BOARDSIZE; ++j) {
 
-            }
+			if(board[i][j] == -1)
+				std::cout << " ■ ";
+			else if(board[i][j] == -3)
+				std::cout << " □ ";
+			else 
+				std::cout << " "<<board[i][j]<<" ";
 
-        }
-        cout << endl;
-        cout << endl;
-    }
+		}
+		std::cout << std::endl;
+		std::cout << std::endl;
+	}
 }
 
-int main(int argc, char* argv[])
+void updateKey(char key) 
 {
 
-    char buf[BUFSIZE];
-    char key;
-    char SERVER_ADDR[BUFSIZE];
+	// 이전 위치 복원
+	//board[y][x] = ((y + x) % 2 == 0) ? -1 : 1;
 
-    cout << "IP 주소 입력 : ";
-    cin >> SERVER_ADDR;
+	switch (key) {
+		// WASD로 이동하는 경우
+	case 'w': if (y > 0) y--; break;
+	case 's': if (y < BOARDSIZE - 1) y++; break;
+	case 'a': if (x > 0) x--; break;
+	case 'd': if (x < BOARDSIZE - 1) x++; break;
 
-    initializeBoard();
-    printBoard();
+		// 커서키로 이동하는 경우
+	case 72: if (y > 0) y--; break; // UP
+	case 80: if (y < BOARDSIZE - 1) y++; break; // DOWN
+	case 75: if (x > 0) x--; break; // LEFT
+	case 77: if (x < BOARDSIZE - 1) x++; break; // RIGHT
+	}
 
+	//board[y][x] = 0; // 새 위치에 Pawn 설정
+	//std::cout << "Pawn 위치: " << x << ", " << y << std::endl;
 
-    std::wcout.imbue(std::locale("korean"));    // 에러 메세지 한글로
-
-    WSADATA WSAData;
-    WSAStartup(MAKEWORD(2, 0), &WSAData);       // 윈도우에서만 필요한 코드
-
-    SOCKET server_s = WSASocket(AF_INET, SOCK_STREAM, IPPROTO_TCP, nullptr, 0, 0);
-    SOCKADDR_IN server_a;
-    server_a.sin_family = AF_INET;
-    server_a.sin_port = htons(PORT);        // 다른 프로그램과 충돌하지 않는 숫자로 설정해야 함
-    inet_pton(AF_INET, SERVER_ADDR, &server_a.sin_addr);
-    connect(server_s, reinterpret_cast<SOCKADDR*>(&server_a), sizeof(server_a));
-
-    while (true) {
-
-        // 키 입력 받기
-        std::cout << "key 입력 > ";
-        key = _getch(); // 키 입력 받기
-
-        // 입력받은 키 값을 buf의 첫 번째 요소에 저장
-        buf[0] = key;
-
-        // 문자열의 끝을 나타내기 위해 두 번째 요소에 널 문자 추가
-        buf[1] = '\0';
-        //cout << buf << endl;
-
-        WSABUF wsabuf[1];
-        wsabuf[0].buf = buf;
-        wsabuf[0].len = static_cast<int>(strlen(buf)) + 1;      // 문자열 끝의 0까지 포함해서 전송한다.
-        if (wsabuf[0].len == 1)
-            break;
-
-        DWORD sent_size;
-        WSASend(server_s, wsabuf, 1, &sent_size, 0, nullptr, nullptr);
-
-        wsabuf[0].buf = buf;
-        wsabuf[0].len = BUFSIZE;	// 서버에서 얼만큼 보낼 지 모르니까 일단 크게
-        DWORD recv_size;
-        DWORD recv_flag = 0;
-        WSARecv(server_s, wsabuf, 1, &recv_size, &recv_flag, nullptr, nullptr);
-
-        cout << buf << endl;
-
-        // 서버로부터 받은 새로운 위치 정보로 말 이동 코드
-        movePiece(x, y, buf);
-        printBoard();
-
-    }
-    closesocket(server_s);
-
-    WSACleanup();
+	sprintf_s(buf, "%d %d", x, y);
+	std::cout << buf << std::endl;
 
 
+	
 
+}
+
+
+void read_n_send()
+{
+	std::cout << "Enter Message : ";
+
+	char key;
+	key = _getch(); // 키 입력 받기
+
+	updateKey( key); // 키에 따라 Pawn 위치 업데이트
+
+	wsabuf[0].buf = buf;
+	wsabuf[0].len = static_cast<int>(strlen(buf)) + 1;
+	if (wsabuf[0].len == 1) {
+		bshutdown = true;
+		return;
+	}
+	ZeroMemory(&wsaover, sizeof(wsaover));
+	WSASend(server_s, wsabuf, 1, nullptr, 0, &wsaover, send_callback);			// 업데이트된 Pawn 위치 전송
+
+}
+
+void CALLBACK recv_callback(DWORD err, DWORD recv_size,
+	LPWSAOVERLAPPED pwsaover, DWORD sendflag)
+{
+	int p_size = 0;
+	
+	while (recv_size > p_size) {
+		int m_size = buf[0 + p_size];
+		int cl_id = static_cast<int>(buf[1 + p_size]);
+		std::cout << "Player [" << cl_id  << "] : ";
+		for (DWORD i = 0; i < m_size; ++i)
+			std::cout << cl_id <<" " << buf[i + p_size + 2];
+		std::cout << std::endl;
+
+		
+		// 클라 보드 위치 업데이트
+		board[Pawn[cl_id][1]][Pawn[cl_id][0]] = ((Pawn[cl_id][0] + Pawn[cl_id][1]) % 2 == 0) ? -3 : -1;		// 이전 Pawn 위치 초기화
+		sscanf_s(buf + p_size + 2, "%d %d", &Pawn[cl_id][0], &Pawn[cl_id][1]);	// id에 따른 좌표 저장
+
+		if (isf) {
+			x = Pawn[cl_id][0];
+			y = Pawn[cl_id][1];
+			isf = false;
+		}
+
+		board[Pawn[cl_id][1]][Pawn[cl_id][0]] = cl_id;		// Pawn 위치 업데이트
+
+		p_size = p_size + m_size;
+
+	}
+		printBoard();
+
+	read_n_send();
+}
+
+void CALLBACK send_callback(DWORD err, DWORD sent_size,
+	LPWSAOVERLAPPED pwsaover, DWORD sendflag)
+{
+	wsabuf[0].len = BUFSIZE;
+	DWORD recv_flag = 0;
+	ZeroMemory(pwsaover, sizeof(*pwsaover));
+	WSARecv(server_s, wsabuf, 1, nullptr, &recv_flag, pwsaover, recv_callback);
+}
+
+int main()
+{
+	initializeBoard();
+
+	std::wcout.imbue(std::locale("korean"));
+	WSADATA WSAData;
+	WSAStartup(MAKEWORD(2, 0), &WSAData);
+	server_s = WSASocket(AF_INET, SOCK_STREAM,
+		IPPROTO_TCP, nullptr, 0, WSA_FLAG_OVERLAPPED);
+	SOCKADDR_IN server_a;
+	server_a.sin_family = AF_INET;
+	server_a.sin_port = htons(PORT);
+	inet_pton(AF_INET, SERVER_ADDR, &server_a.sin_addr);
+	connect(server_s, reinterpret_cast<sockaddr*>(&server_a), sizeof(server_a));
+	read_n_send();
+	while (false == bshutdown) {
+		SleepEx(0, TRUE);
+	}
+	closesocket(server_s);
+	WSACleanup();
 }
