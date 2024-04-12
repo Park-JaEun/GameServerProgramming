@@ -1,5 +1,4 @@
 #include <iostream>
-#include <string>
 #include <WS2tcpip.h>
 #include <unordered_map>
 #pragma comment (lib, "WS2_32.LIB")
@@ -118,21 +117,20 @@ void CALLBACK recv_callback(DWORD err, DWORD recv_size,
 	if (0 != err) {
 		print_error("WSARecv", WSAGetLastError());
 		outid = g_session_map[pover];
+		g_players[outid].broadcast(recv_size);
+		g_players.erase(outid);
 	}
-	int my_id = g_session_map[pover];
-	if (0 == recv_size) {
-		g_players.erase(my_id);
-
-		for (auto& player : g_players) {
-			std::string msg = "Player " + std::to_string(outid) + " left.";
-			player.second.do_send(-1, (char*)msg.c_str(), msg.size()); // -1은 시스템 메시지를 나타내는 예제 ID
+	else {
+		int my_id = g_session_map[pover];
+		if (0 == recv_size) {
+			g_players.erase(my_id);
+			return;
 		}
-		return;
+		g_players[my_id].print_message(recv_size);
+		g_players[my_id].broadcast(recv_size);
+		g_players[my_id].do_recv();
 	}
-
-	g_players[my_id].print_message(recv_size);
-	g_players[my_id].broadcast(recv_size);
-	g_players[my_id].do_recv();
+	
 }
 
 int main()

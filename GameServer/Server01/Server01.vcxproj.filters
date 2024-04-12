@@ -21,5 +21,14 @@
     <ClCompile Include="SERVER02.cpp">
       <Filter>소스 파일</Filter>
     </ClCompile>
+    <ClCompile Include="SERVER03.cpp">
+      <Filter>소스 파일</Filter>
+    </ClCompile>
+    <ClCompile Include="chat_SERVER.cpp">
+      <Filter>소스 파일</Filter>
+    </ClCompile>
+    <ClCompile Include="iocp_server.cpp">
+      <Filter>소스 파일</Filter>
+    </ClCompile>
   </ItemGroup>
 </Project>

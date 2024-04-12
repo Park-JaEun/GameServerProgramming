@@ -106,7 +106,13 @@ void read_n_send()
 	char key;
 	key = _getch(); // 키 입력 받기
 
-	updateKey( key); // 키에 따라 Pawn 위치 업데이트
+	if (key == 'q') { // 종료 조건
+		strcpy_s(buf, "quit"); // 서버에 전송할 종료 메시지
+		bshutdown = true; // 종료 플래그 설정
+	}
+	else {
+		updateKey(key); // 키에 따라 위치 업데이트
+	}
 
 	wsabuf[0].buf = buf;
 	wsabuf[0].len = static_cast<int>(strlen(buf)) + 1;
