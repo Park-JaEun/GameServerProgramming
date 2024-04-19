@@ -19,7 +19,7 @@ using namespace chrono;
 
 extern HWND		hWnd;
 
-const static int MAX_TEST = 10000;				// 최대 동접 이만큼
+const static int MAX_TEST = 20000;				// 최대 동접 이만큼
 const static int MAX_CLIENTS = MAX_TEST * 2;	// 세션 준비 이만큼
 const static int INVALID_ID = -1;
 const static int MAX_PACKET_SIZE = 255;
