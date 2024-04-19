@@ -112,6 +112,7 @@ OVER_EXP g_a_over;
 
 void SESSION::send_move_packet(int c_id)
 {
+
 	SC_MOVE_PLAYER_PACKET p;
 	p.id = c_id;
 	p.size = sizeof(SC_MOVE_PLAYER_PACKET);

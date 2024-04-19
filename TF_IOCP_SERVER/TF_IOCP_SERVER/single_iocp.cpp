@@ -13,6 +13,9 @@ using namespace std;
 constexpr int MAX_USER = 10;
 
 enum COMP_TYPE { OP_ACCEPT, OP_RECV, OP_SEND };
+
+constexpr int VIEW_RANGE = 5;
+
 enum class S_STATE { ST_FREE, ST_ALLOC, ST_INGAME};
 
 class OVER_EXP {
@@ -94,6 +97,17 @@ public:
 array<SESSION, MAX_USER> clients;
 HANDLE g_h_iocp;
 
+bool can_see(int a, int b)
+{
+    int dist = (clients[a].x - clients[b].x) * (clients[a].x - clients[b].x) +
+        (clients[a].y - clients[b].y) * (clients[a].y - clients[b].y);
+    
+    return dist <= VIEW_RANGE * VIEW_RANGE;
+
+    //if (abs(clients[a].x - clients[b].x) > VIEW_RANGE) return false;      
+
+}
+
 void SESSION::send_move_packet(int c_id)
 {
     SC_MOVE_PLAYER_PACKET p;
@@ -160,9 +174,12 @@ void process_packet(int c_id, char* packet)
         }
         clients[c_id].x = x;
         clients[c_id].y = y;
-        for (auto& pl : clients)
+        for (auto& pl : clients) {
+
             if (S_STATE::ST_INGAME == pl.in_use)
                 pl.send_move_packet(c_id);
+        }
+
         break;
     }
     }

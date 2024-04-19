@@ -19,8 +19,8 @@ using namespace chrono;
 
 extern HWND		hWnd;
 
-const static int MAX_TEST = 10000;
-const static int MAX_CLIENTS = MAX_TEST * 2;
+const static int MAX_TEST = 10000;				// 최대 동접 이만큼
+const static int MAX_CLIENTS = MAX_TEST * 2;	// 세션 준비 이만큼
 const static int INVALID_ID = -1;
 const static int MAX_PACKET_SIZE = 255;
 const static int MAX_BUFF_SIZE = 255;
@@ -58,7 +58,7 @@ struct CLIENT {
 };
 
 array<int, MAX_CLIENTS> client_map;
-array<CLIENT, MAX_CLIENTS> g_clients;
+array<CLIENT, MAX_CLIENTS> g_clients;	// 세션임
 atomic_int num_connections;
 atomic_int client_to_close;
 atomic_int active_clients;
@@ -170,7 +170,7 @@ void ProcessPacket(int ci, unsigned char packet[])
 	}
 }
 
-void Worker_Thread()
+void Worker_Thread()		// 서버에서 온 패킷	처리하는 스레드
 {
 	while (true) {
 		DWORD io_size;
@@ -337,7 +337,7 @@ fail_to_connect:
 	return;
 }
 
-void Test_Thread()
+void Test_Thread()			// ai 동작 스레드
 {
 	while (true) {
 		//Sleep(max(20, global_delay));

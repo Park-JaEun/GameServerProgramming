@@ -60,7 +60,7 @@ public:
 	void a_draw() {
 		g_window->draw(m_sprite);
 	}
-
+	 
 	void move(int x, int y) {
 		m_x = x;
 		m_y = y;
@@ -275,6 +275,7 @@ int main()
 {
 	wcout.imbue(locale("korean"));
 	sf::Socket::Status status = s_socket.connect("127.0.0.1", PORT_NUM);
+	//sf::Socket::Status status = s_socket.connect("192.168.141.126", PORT_NUM);
 	s_socket.setBlocking(false);
 
 	if (status != sf::Socket::Done) {

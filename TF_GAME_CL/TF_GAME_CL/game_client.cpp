@@ -252,8 +252,8 @@ int main()
 	wcout.imbue(locale("korean"));
 	std::cout << "Enter User Name : ";
 	std::cin >> avatar_name;
-	//sf::Socket::Status status = socket.connect("127.0.0.1", PORT_NUM);
-	sf::Socket::Status status = socket.connect("192.168.141.116", PORT_NUM);
+	sf::Socket::Status status = socket.connect("127.0.0.1", PORT_NUM);
+	//sf::Socket::Status status = socket.connect("192.168.141.116", PORT_NUM);
 	socket.setBlocking(false);
 
 	if (status != sf::Socket::Done) {
