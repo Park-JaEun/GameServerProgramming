@@ -19,7 +19,7 @@ using namespace chrono;
 
 extern HWND		hWnd;
 
-const static int MAX_TEST = 20000;				// 최대 동접 이만큼
+const static int MAX_TEST = 5000;				// 최대 동접 이만큼
 const static int MAX_CLIENTS = MAX_TEST * 2;	// 세션 준비 이만큼
 const static int INVALID_ID = -1;
 const static int MAX_PACKET_SIZE = 255;
@@ -118,8 +118,8 @@ void SendPacket(int cl, void* packet)
 		&over->over, NULL);
 	if (0 != ret) {
 		int err_no = WSAGetLastError();
-		if (WSA_IO_PENDING != err_no)
-			error_display("Error in SendPacket:", err_no);
+		//if (WSA_IO_PENDING != err_no)
+			//error_display("Error in SendPacket:", err_no);
 	}
 	// std::cout << "Send Packet [" << ptype << "] To Client : " << cl << std::endl;
 }
@@ -147,7 +147,12 @@ void ProcessPacket(int ci, unsigned char packet[])
 	}
 					   break;
 	case SC_ADD_PLAYER: break;
-	case SC_REMOVE_PLAYER: break;
+	case SC_REMOVE_PLAYER: 
+	{ 
+		//DisconnectClient(ci);
+		
+		break;
+	}
 	case SC_LOGIN_INFO:
 	{
 		g_clients[ci].connected = true;
@@ -298,9 +303,9 @@ void Adjust_Number_Of_Client()
 
 
 	int Result = WSAConnect(g_clients[num_connections].client_socket, (sockaddr*)&ServerAddr, sizeof(ServerAddr), NULL, NULL, NULL, NULL);
-	if (0 != Result) {
-		error_display("WSAConnect : ", GetLastError());
-	}
+	//if (0 != Result) {
+	//	error_display("WSAConnect : ", GetLastError());
+	//}
 
 	g_clients[num_connections].curr_packet_size = 0;
 	g_clients[num_connections].prev_packet_data = 0;
@@ -328,7 +333,7 @@ void Adjust_Number_Of_Client()
 		int err_no = WSAGetLastError();
 		if (err_no != WSA_IO_PENDING)
 		{
-			error_display("RECV ERROR", err_no);
+			//error_display("RECV ERROR", err_no);
 			goto fail_to_connect;
 		}
 	}
