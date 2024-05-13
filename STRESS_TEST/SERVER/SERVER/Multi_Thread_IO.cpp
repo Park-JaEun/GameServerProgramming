@@ -91,8 +91,8 @@ public:
 		do_send(&p);
 	}
 	void send_move_packet(int c_id);
-	void send_add_player_packet(int c_id);
-	void send_remove_player_packet(int c_id)
+	void send_add_object_packet(int c_id);
+	void send_remove_object_packet(int c_id)
 	{
 		SC_REMOVE_PLAYER_PACKET p;
 		p.id = c_id;
@@ -102,7 +102,7 @@ public:
 	}
 };
 
-array<SESSION, MAX_USER> clients;
+array<SESSION, MAX_USER> objects;
 SOCKET g_s_socket;
 
 void SESSION::send_move_packet(int c_id)
@@ -111,29 +111,29 @@ void SESSION::send_move_packet(int c_id)
 	p.id = c_id;
 	p.size = sizeof(SC_MOVE_PLAYER_PACKET);
 	p.type = SC_MOVE_PLAYER;
-	p.x = clients[c_id].x;
-	p.y = clients[c_id].y;
-	p.move_time = clients[c_id]._last_move_time;
+	p.x = objects[c_id].x;
+	p.y = objects[c_id].y;
+	p.move_time = objects[c_id]._last_move_time;
 	do_send(&p);
 }
 
-void SESSION::send_add_player_packet(int c_id)
+void SESSION::send_add_object_packet(int c_id)
 {
 	SC_ADD_PLAYER_PACKET add_packet;
 	add_packet.id = c_id;
-	strcpy_s(add_packet.name, clients[c_id]._name);
+	strcpy_s(add_packet.name, objects[c_id]._name);
 	add_packet.size = sizeof(add_packet);
 	add_packet.type = SC_ADD_PLAYER;
-	add_packet.x = clients[c_id].x;
-	add_packet.y = clients[c_id].y;
+	add_packet.x = objects[c_id].x;
+	add_packet.y = objects[c_id].y;
 	do_send(&add_packet);
 }
 
 int get_new_client_id()
 {
 	for (int i = 0; i < MAX_USER; ++i) {
-		lock_guard <mutex> ll{ clients[i]._s_lock };
-		if (clients[i]._state == ST_FREE)
+		lock_guard <mutex> ll{ objects[i]._s_lock };
+		if (objects[i]._state == ST_FREE)
 			return i;
 	}
 	return -1;
@@ -144,36 +144,36 @@ void process_packet(int c_id, char* packet)
 	switch (packet[1]) {
 	case CS_LOGIN: {
 		CS_LOGIN_PACKET* p = reinterpret_cast<CS_LOGIN_PACKET*>(packet);
-		strcpy_s(clients[c_id]._name, p->name);
-		clients[c_id].send_login_info_packet();
+		strcpy_s(objects[c_id]._name, p->name);
+		objects[c_id].send_login_info_packet();
 		{
-			lock_guard<mutex> ll{ clients[c_id]._s_lock };
-			clients[c_id]._state = ST_INGAME;
+			lock_guard<mutex> ll{ objects[c_id]._s_lock };
+			objects[c_id]._state = ST_INGAME;
 		}
-		for (auto& pl : clients) {
+		for (auto& pl : objects) {
 			lock_guard<mutex> ll(pl._s_lock);
 			if (ST_INGAME != pl._state) continue;
 			if (pl._id == c_id) continue;
-			pl.send_add_player_packet(c_id);
-			clients[c_id].send_add_player_packet(pl._id);
+			pl.send_add_object_packet(c_id);
+			objects[c_id].send_add_object_packet(pl._id);
 		}
 		break;
 	}
 	case CS_MOVE: {
 		CS_MOVE_PACKET* p = reinterpret_cast<CS_MOVE_PACKET*>(packet);
-		clients[c_id]._last_move_time = p->move_time;
-		short x = clients[c_id].x;
-		short y = clients[c_id].y;
+		objects[c_id]._last_move_time = p->move_time;
+		short x = objects[c_id].x;
+		short y = objects[c_id].y;
 		switch (p->direction) {
 		case 0: if (y > 0) y--; break;
 		case 1: if (y < W_HEIGHT - 1) y++; break;
 		case 2: if (x > 0) x--; break;
 		case 3: if (x < W_WIDTH - 1) x++; break;
 		}
-		clients[c_id].x = x;
-		clients[c_id].y = y;
+		objects[c_id].x = x;
+		objects[c_id].y = y;
 
-		for (auto& cl : clients) {
+		for (auto& cl : objects) {
 			lock_guard<mutex> ll(cl._s_lock);
 			if (cl._state != ST_INGAME) continue;
 			cl.send_move_packet(c_id);
@@ -185,17 +185,17 @@ void process_packet(int c_id, char* packet)
 void disconnect(int c_id)
 {
 	{
-		lock_guard<mutex> ll(clients[c_id]._s_lock);
-		if (clients[c_id]._state == ST_FREE) return;
-		closesocket(clients[c_id]._socket);
-		clients[c_id]._state = ST_FREE;
+		lock_guard<mutex> ll(objects[c_id]._s_lock);
+		if (objects[c_id]._state == ST_FREE) return;
+		closesocket(objects[c_id]._socket);
+		objects[c_id]._state = ST_FREE;
 	}
 
-	for (auto& pl : clients) {
+	for (auto& pl : objects) {
 		lock_guard<mutex> ll(pl._s_lock);
 		if (ST_INGAME != pl._state) continue;
 		if (pl._id == c_id) continue;
-		pl.send_remove_player_packet(c_id);
+		pl.send_remove_object_packet(c_id);
 	}
 }
 
@@ -208,10 +208,10 @@ void client_thread(int c_id)
 		FD_ZERO(&read_set);
 
 		{
-			lock_guard<mutex> ll(clients[c_id]._s_lock);
-			if (clients[c_id]._state == ST_FREE)
+			lock_guard<mutex> ll(objects[c_id]._s_lock);
+			if (objects[c_id]._state == ST_FREE)
 				break;
-			FD_SET(clients[c_id]._socket, &read_set);
+			FD_SET(objects[c_id]._socket, &read_set);
 		}
 
 		timeval timeout;
@@ -224,8 +224,8 @@ void client_thread(int c_id)
 			break;
 		}
 
-		if (FD_ISSET(clients[c_id]._socket, &read_set)) {
-			clients[c_id].do_recv();
+		if (FD_ISSET(objects[c_id]._socket, &read_set)) {
+			objects[c_id].do_recv();
 		}
 	}
 
@@ -259,15 +259,15 @@ int main()
 		int client_id = get_new_client_id();
 		if (client_id != -1) {
 			{
-				lock_guard<mutex> ll(clients[client_id]._s_lock);
-				clients[client_id]._state = ST_ALLOC;
+				lock_guard<mutex> ll(objects[client_id]._s_lock);
+				objects[client_id]._state = ST_ALLOC;
 			}
-			clients[client_id].x = 0;
-			clients[client_id].y = 0;
-			clients[client_id]._id = client_id;
-			clients[client_id]._name[0] = 0;
-			clients[client_id]._prev_remain = 0;
-			clients[client_id]._socket = c_socket;
+			objects[client_id].x = 0;
+			objects[client_id].y = 0;
+			objects[client_id]._id = client_id;
+			objects[client_id]._name[0] = 0;
+			objects[client_id]._prev_remain = 0;
+			objects[client_id]._socket = c_socket;
 
 			client_threads.emplace_back(client_thread, client_id);
 			client_threads.back().detach();

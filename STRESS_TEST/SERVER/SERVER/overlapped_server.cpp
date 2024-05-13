@@ -94,8 +94,8 @@ public:
 		do_send(&p);
 	}
 	void send_move_packet(int c_id);
-	void send_add_player_packet(int c_id);
-	void send_remove_player_packet(int c_id)
+	void send_add_object_packet(int c_id);
+	void send_remove_object_packet(int c_id)
 	{
 		SC_REMOVE_PLAYER_PACKET p;
 		p.id = c_id;
@@ -105,7 +105,7 @@ public:
 	}
 };
 
-array<SESSION, MAX_USER> clients;
+array<SESSION, MAX_USER> objects;
 
 //SOCKET g_s_socket, g_c_socket;
 //OVER_EXP g_a_over;
@@ -117,28 +117,28 @@ void SESSION::send_move_packet(int c_id)
 	p.id = c_id;
 	p.size = sizeof(SC_MOVE_PLAYER_PACKET);
 	p.type = SC_MOVE_PLAYER;
-	p.x = clients[c_id].x;
-	p.y = clients[c_id].y;
-	p.move_time = clients[c_id]._last_move_time;
+	p.x = objects[c_id].x;
+	p.y = objects[c_id].y;
+	p.move_time = objects[c_id]._last_move_time;
 	do_send(&p);
 }
 
-void SESSION::send_add_player_packet(int c_id)
+void SESSION::send_add_object_packet(int c_id)
 {
 	SC_ADD_PLAYER_PACKET add_packet;
 	add_packet.id = c_id;
-	strcpy_s(add_packet.name, clients[c_id]._name);
+	strcpy_s(add_packet.name, objects[c_id]._name);
 	add_packet.size = sizeof(add_packet);
 	add_packet.type = SC_ADD_PLAYER;
-	add_packet.x = clients[c_id].x;
-	add_packet.y = clients[c_id].y;
+	add_packet.x = objects[c_id].x;
+	add_packet.y = objects[c_id].y;
 	do_send(&add_packet);
 }
 
 int get_new_client_id()
 {
 	for (int i = 0; i < MAX_USER; ++i) {
-		if (clients[i]._state == ST_FREE)
+		if (objects[i]._state == ST_FREE)
 			return i;
 	}
 	return -1;
@@ -149,31 +149,31 @@ void process_packet(int c_id, char* packet)
 	switch (packet[1]) {
 	case CS_LOGIN: {
 		CS_LOGIN_PACKET* p = reinterpret_cast<CS_LOGIN_PACKET*>(packet);
-		strcpy_s(clients[c_id]._name, p->name);
-		clients[c_id].send_login_info_packet();
-		for (auto& pl : clients) {
+		strcpy_s(objects[c_id]._name, p->name);
+		objects[c_id].send_login_info_packet();
+		for (auto& pl : objects) {
 			if (ST_INGAME != pl._state) continue;
 			if (pl._id == c_id) continue;
-			pl.send_add_player_packet(c_id);
-			clients[c_id].send_add_player_packet(pl._id);
+			pl.send_add_object_packet(c_id);
+			objects[c_id].send_add_object_packet(pl._id);
 		}
 		break;
 	}
 	case CS_MOVE: {
 		CS_MOVE_PACKET* p = reinterpret_cast<CS_MOVE_PACKET*>(packet);
-		clients[c_id]._last_move_time = p->move_time;
-		short x = clients[c_id].x;
-		short y = clients[c_id].y;
+		objects[c_id]._last_move_time = p->move_time;
+		short x = objects[c_id].x;
+		short y = objects[c_id].y;
 		switch (p->direction) {
 		case 0: if (y > 0) y--; break;
 		case 1: if (y < W_HEIGHT - 1) y++; break;
 		case 2: if (x > 0) x--; break;
 		case 3: if (x < W_WIDTH - 1) x++; break;
 		}
-		clients[c_id].x = x;
-		clients[c_id].y = y;
+		objects[c_id].x = x;
+		objects[c_id].y = y;
 
-		for (auto& cl : clients) {
+		for (auto& cl : objects) {
 			if (cl._state != ST_INGAME) continue;
 			cl.send_move_packet(c_id);
 
@@ -184,13 +184,13 @@ void process_packet(int c_id, char* packet)
 
 void disconnect(int c_id)
 {
-	for (auto& pl : clients) {
+	for (auto& pl : objects) {
 		if (ST_INGAME != pl._state) continue;
 		if (pl._id == c_id) continue;
-		pl.send_remove_player_packet(c_id);
+		pl.send_remove_object_packet(c_id);
 	}
-	closesocket(clients[c_id]._socket);
-	clients[c_id]._state = ST_FREE;
+	closesocket(objects[c_id]._socket);
+	objects[c_id]._state = ST_FREE;
 }
 
 void CALLBACK recv_callback(DWORD err, DWORD num_bytes, LPWSAOVERLAPPED over, DWORD flags)
@@ -200,7 +200,7 @@ void CALLBACK recv_callback(DWORD err, DWORD num_bytes, LPWSAOVERLAPPED over, DW
 
 	OVER_EXP* ex_over = reinterpret_cast<OVER_EXP*>(over);
 
-	int remain_data = num_bytes + clients[key]._prev_remain;
+	int remain_data = num_bytes + objects[key]._prev_remain;
 	char* p = ex_over->_send_buf;
 	while (remain_data > 0) {
 		int packet_size = p[0];
@@ -211,11 +211,11 @@ void CALLBACK recv_callback(DWORD err, DWORD num_bytes, LPWSAOVERLAPPED over, DW
 		}
 		else break;
 	}
-	clients[key]._prev_remain = remain_data;
+	objects[key]._prev_remain = remain_data;
 	if (remain_data > 0) {
 		memcpy(ex_over->_send_buf, p, remain_data);
 	}
-	clients[key].do_recv();
+	objects[key].do_recv();
 }
 
 void CALLBACK send_callback(DWORD err, DWORD num_bytes, LPWSAOVERLAPPED over, DWORD flags)
@@ -247,14 +247,14 @@ int main()
 
 		int client_id = get_new_client_id();
 		if (client_id != -1) {
-			clients[client_id]._state = ST_INGAME;
-			clients[client_id].x = 0;
-			clients[client_id].y = 0;
-			clients[client_id]._id = client_id;
-			clients[client_id]._name[0] = 0;
-			clients[client_id]._prev_remain = 0;
-			clients[client_id]._socket = client;
-			clients[client_id].do_recv();
+			objects[client_id]._state = ST_INGAME;
+			objects[client_id].x = 0;
+			objects[client_id].y = 0;
+			objects[client_id]._id = client_id;
+			objects[client_id]._name[0] = 0;
+			objects[client_id]._prev_remain = 0;
+			objects[client_id]._socket = client;
+			objects[client_id].do_recv();
 		}
 		else {
 			cout << "Max user exceeded.\n";

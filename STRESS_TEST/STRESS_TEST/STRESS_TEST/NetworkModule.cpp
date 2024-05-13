@@ -13,21 +13,21 @@
 #include <queue>
 #include <array>
 #include <memory>
+#include "..\..\SERVER\SERVER\protocol.h"
 
 using namespace std;
 using namespace chrono;
 
 extern HWND		hWnd;
 
-const static int MAX_TEST = 5000;				// 최대 동접 이만큼
-const static int MAX_CLIENTS = MAX_TEST * 2;	// 세션 준비 이만큼
+const static int MAX_TEST = 30000;				// 최대 동접 이만큼
+const static int MAX_CLIENTS =MAX_USER*2+MAX_NPC;	// 세션 준비 이만큼
 const static int INVALID_ID = -1;
 const static int MAX_PACKET_SIZE = 255;
 const static int MAX_BUFF_SIZE = 255;
 
 #pragma comment (lib, "ws2_32.lib")
 
-#include "..\..\SERVER\SERVER\protocol.h"
 
 HANDLE g_hiocp;
 
@@ -255,7 +255,7 @@ void Worker_Thread()		// 서버에서 온 패킷	처리하는 스레드
 	}
 }
 
-constexpr int DELAY_LIMIT = 100;
+constexpr int DELAY_LIMIT = 10000;
 constexpr int DELAY_LIMIT2 = 150;
 constexpr int ACCEPT_DELY = 50;
 
