@@ -14,4 +14,8 @@ function event_player_move(player)
          API_SendMessage(myid, player, "HELLO");
       end
    end
-end
+  end
+
+function event_player_move_done(player)
+    API_SendMessage(myid, player, "BYE");
+ end

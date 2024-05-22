@@ -75,6 +75,8 @@ public:
 	int		last_move_time;
 	lua_State*	_L;
 	mutex	_ll;
+	int _npc_move_time;
+	bool _send_chat;
 public:
 	SESSION()
 	{
@@ -84,6 +86,8 @@ public:
 		_name[0] = 0;
 		_state = ST_FREE;
 		_prev_remain = 0;
+		_npc_move_time = 0;
+		_send_chat = false;
 	}
 
 	~SESSION() {}
@@ -359,13 +363,55 @@ void do_npc_random_move(int npc_id)
 	int x = npc.x;
 	int y = npc.y;
 	switch (rand() % 4) {
-	case 0: if (x < (W_WIDTH - 1)) x++; break;
-	case 1: if (x > 0) x--; break;
-	case 2: if (y < (W_HEIGHT - 1)) y++; break;
-	case 3:if (y > 0) y--; break;
+	case 0: 
+		if (x < (W_WIDTH - 1)) 	{
+			x++; 
+			if (clients[npc_id]._send_chat == true)/* cout << "HELLO" << endl;*/
+				clients[npc_id]._npc_move_time++;
+
+			if (clients[npc_id]._npc_move_time > 3)	{
+				clients[npc_id]._send_chat = false;
+				clients[npc_id]._npc_move_time = 0;
+			}
+		}break;
+	case 1: 
+		if (x > 0)	{
+			x--;
+			if (clients[npc_id]._send_chat == true)/*cout << "HELLO" << endl;*/
+				clients[npc_id]._npc_move_time++;
+
+			if (clients[npc_id]._npc_move_time > 3)	{
+				clients[npc_id]._send_chat = false;
+				clients[npc_id]._npc_move_time = 0;
+			}
+		}break;
+	case 2: 
+		if (y < (W_HEIGHT - 1))	{
+			y++;
+			if (clients[npc_id]._send_chat == true)/*cout << "HELLO" << endl;*/
+				clients[npc_id]._npc_move_time++;
+
+			if (clients[npc_id]._npc_move_time > 3)	{
+				clients[npc_id]._send_chat = false;
+				clients[npc_id]._npc_move_time = 0;
+			}
+		}break;
+	case 3:
+		if (y > 0)	{
+			y--;
+			if (clients[npc_id]._send_chat == true)/*cout << "HELLO" << endl;*/
+				clients[npc_id]._npc_move_time++;
+
+			if (clients[npc_id]._npc_move_time > 3)	{
+				clients[npc_id]._send_chat = false;
+				clients[npc_id]._npc_move_time = 0;
+			}
+		}break;
 	}
 	npc.x = x;
 	npc.y = y;
+
+	//clients[npc_id]._npc_move_time++;	//
 
 	unordered_set<int> new_vl;
 	for (auto& obj : clients) {	// 보틀넥임. 섹터링으로 최적화해야 함.
@@ -385,7 +431,7 @@ void do_npc_random_move(int npc_id)
 			clients[pl].send_move_packet(npc._id);
 		}
 	}
-	///vvcxxccxvvdsvdvds
+	
 	for (auto pl : old_vl) {
 		if (0 == new_vl.count(pl)) {
 			clients[pl]._vl.lock();
@@ -486,6 +532,32 @@ void worker_thread(HANDLE h_iocp)
 				do_npc_random_move(static_cast<int>(key));
 				TIMER_EVENT ev{ key, chrono::system_clock::now() + 1s, EV_RANDOM_MOVE, 0 };
 				timer_queue.push(ev);
+
+				// 디버깅용
+				if (clients[key]._npc_move_time == 3)
+				std::cout << clients[key]._id << " " << clients[key]._npc_move_time << std::endl;
+
+				// npc가 플레이어에게 갔을 때도 HELLO 출력
+				{
+					clients[key]._ll.lock();
+					auto L = clients[key]._L;
+					lua_getglobal(L, "event_player_move");	// 플레이어가 이동함
+					lua_pushnumber(L, ex_over->_ai_target_obj);	// 이동한 애
+					lua_pcall(L, 1, 0, 0);
+					clients[key]._ll.unlock();
+				}
+				
+				if (clients[key]._npc_move_time == 3)
+				{
+					clients[key]._ll.lock();
+					auto L = clients[key]._L;
+					lua_getglobal(L, "event_player_move_done");	// 플레이어가 이동함
+					lua_pushnumber(L, ex_over->_ai_target_obj);	// 이동한 애
+					lua_pcall(L, 1, 0, 0);
+					clients[key]._ll.unlock();
+
+				}
+
 			}
 			else {
 				clients[key]._is_active = false;
@@ -537,6 +609,39 @@ int API_SendMessage(lua_State* L)
 	lua_pop(L, 4);
 
 	clients[user_id].send_chat_packet(my_id, mess);
+
+	// _npc_move_time을 0으로 초기화
+	lock_guard <mutex> ll{ clients[my_id]._s_lock };
+	clients[my_id]._send_chat = true;
+
+	//Sleep(3000); // 3초 대기
+	//clients[user_id]._npc_move_time = 3;
+
+
+
+	return 0;
+}
+
+int API_get_npc_move_time(lua_State* L)
+{
+	int user_id =
+		(int)lua_tointeger(L, -1);
+	lua_pop(L, 2);
+	int _npc_move_time = clients[user_id]._npc_move_time;
+	lua_pushnumber(L, _npc_move_time);
+	return 1;
+}
+
+int API_SendMessage_BYE(lua_State* L)
+{
+	int my_id = (int)lua_tointeger(L, -3);
+	int user_id = (int)lua_tointeger(L, -2);
+	char* mess = (char*)lua_tostring(L, -1);
+
+	lua_pop(L, 4);
+
+	clients[user_id].send_chat_packet(my_id, mess);
+
 	return 0;
 }
 
