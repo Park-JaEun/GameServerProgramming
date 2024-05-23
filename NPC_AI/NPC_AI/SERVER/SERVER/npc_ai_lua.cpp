@@ -552,16 +552,14 @@ void worker_thread(HANDLE h_iocp)
 				
 				// npc가 3번 움직였을 때 BYE 출력
 				//if (clients[key]._npc_move_time == 3)	// 이 판단을 lua에서 하도록 변경
-				{
-					clients[key]._ll.lock();
-					auto L = clients[key]._L;
-					lua_getglobal(L, "event_player_move_done");	
-					lua_pushnumber(L, ex_over->_ai_target_obj);	
-					lua_pcall(L, 1, 0, 0);
-					clients[key]._ll.unlock();
-
-				}
-
+				//{
+				//	clients[key]._ll.lock();
+				//	auto L = clients[key]._L;
+				//	lua_getglobal(L, "event_player_move");	
+				//	lua_pushnumber(L, ex_over->_ai_target_obj);	
+				//	lua_pcall(L, 1, 0, 0);
+				//	clients[key]._ll.unlock();
+				//}
 			}
 			else {
 				clients[key]._is_active = false;
@@ -657,18 +655,7 @@ int API_SendMessage(lua_State* L)
 	return 0;
 }
 
-int API_SendMessage_BYE(lua_State* L)
-{
-	int my_id = (int)lua_tointeger(L, -3);
-	int user_id = (int)lua_tointeger(L, -2);
-	char* mess = (char*)lua_tostring(L, -1);
 
-	lua_pop(L, 4);
-
-	clients[user_id].send_chat_packet(my_id, mess);
-
-	return 0;
-}
 
 void InitializeNPC()
 {
