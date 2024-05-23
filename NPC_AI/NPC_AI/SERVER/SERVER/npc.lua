@@ -17,5 +17,8 @@ function event_player_move(player)
   end
 
 function event_player_move_done(player)
-    API_SendMessage(myid, player, "BYE");
+   my_move_time = API_get_npc_move_time(myid);
+   if(my_move_time == 3) then
+      API_SendMessage_BYE(myid, player, "BYE");
+   end
  end
