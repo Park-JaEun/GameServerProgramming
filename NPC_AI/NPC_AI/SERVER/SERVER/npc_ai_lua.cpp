@@ -77,6 +77,7 @@ public:
 	mutex	_ll;
 	int _npc_move_time;
 	bool _send_chat;
+	int _player;
 public:
 	SESSION()
 	{
@@ -88,6 +89,7 @@ public:
 		_prev_remain = 0;
 		_npc_move_time = 0;
 		_send_chat = false;
+		_player = -1;
 	}
 
 	~SESSION() {}
@@ -235,6 +237,7 @@ void WakeUpNPC(int npc_id, int waker)
 	exover->_comp_type = OP_PLAYER_MOVE;	// 플레이어가 이동했으니까 NPC를 꺠워라
 	exover->_ai_target_obj = waker;	// 깨운 플레이어 정보
 	PostQueuedCompletionStatus(h_iocp, 1, npc_id, &exover->_over);
+	clients[npc_id]._player = waker;
 
 	if (clients[npc_id]._is_active) return;
 	bool old_state = false;
@@ -692,7 +695,7 @@ void do_timer()
 			case EV_RANDOM_MOVE:
 				OVER_EXP* ov = new OVER_EXP;
 				ov->_comp_type = OP_NPC_MOVE;
-				ov->_ai_target_obj = 0;
+				ov->_ai_target_obj = clients[ev.obj_id]._player;
 				PostQueuedCompletionStatus(h_iocp, 1, ev.obj_id, &ov->_over);
 				break;
 			}
