@@ -540,15 +540,6 @@ void worker_thread(HANDLE h_iocp)
 				//if (clients[key]._npc_move_time == 3)
 				//std::cout << clients[key]._id << " " << clients[key]._npc_move_time << std::endl;
 
-				//// npc가 플레이어에게 갔을 때도 HELLO 출력
-				//{
-				//	clients[key]._ll.lock();
-				//	auto L = clients[key]._L;
-				//	lua_getglobal(L, "event_player_move");	// 플레이어가 이동함
-				//	lua_pushnumber(L, ex_over->_ai_target_obj);	// 이동한 애
-				//	lua_pcall(L, 1, 0, 0);
-				//	clients[key]._ll.unlock();
-				//}
 				
 				// npc가 3번 움직였을 때 BYE 출력
 				//if (clients[key]._npc_move_time == 3)	// 이 판단을 lua에서 하도록 변경
