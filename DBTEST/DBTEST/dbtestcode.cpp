@@ -77,7 +77,7 @@ int main() {
                 if (retcode == SQL_SUCCESS || retcode == SQL_SUCCESS_WITH_INFO) {
                     retcode = SQLAllocHandle(SQL_HANDLE_STMT, hdbc, &hstmt);
 
-                    retcode = SQLExecDirect(hstmt, (SQLWCHAR*)L"SELECT user_id, user_name, user_level FROM user_table WHERE user_id=1", SQL_NTS);
+                    retcode = SQLExecDirect(hstmt, (SQLWCHAR*)L"EXEC select_highlevel 10", SQL_NTS);
                     if (retcode == SQL_SUCCESS || retcode == SQL_SUCCESS_WITH_INFO) {
 
                         // Bind columns 1, 2, and 3  
