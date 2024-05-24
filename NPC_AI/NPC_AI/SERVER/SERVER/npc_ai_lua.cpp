@@ -543,14 +543,14 @@ void worker_thread(HANDLE h_iocp)
 				
 				// npc가 3번 움직였을 때 BYE 출력
 				//if (clients[key]._npc_move_time == 3)	// 이 판단을 lua에서 하도록 변경
-				//{
-				//	clients[key]._ll.lock();
-				//	auto L = clients[key]._L;
-				//	lua_getglobal(L, "event_player_move");	
-				//	lua_pushnumber(L, ex_over->_ai_target_obj);	
-				//	lua_pcall(L, 1, 0, 0);
-				//	clients[key]._ll.unlock();
-				//}
+				{
+					clients[key]._ll.lock();
+					auto L = clients[key]._L;
+					lua_getglobal(L, "event_player_move");	
+					lua_pushnumber(L, ex_over->_ai_target_obj);	
+					lua_pcall(L, 1, 0, 0);
+					clients[key]._ll.unlock();
+				}
 			}
 			else {
 				clients[key]._is_active = false;
@@ -692,6 +692,7 @@ void do_timer()
 			case EV_RANDOM_MOVE:
 				OVER_EXP* ov = new OVER_EXP;
 				ov->_comp_type = OP_NPC_MOVE;
+				ov->_ai_target_obj = 0;
 				PostQueuedCompletionStatus(h_iocp, 1, ev.obj_id, &ov->_over);
 				break;
 			}
