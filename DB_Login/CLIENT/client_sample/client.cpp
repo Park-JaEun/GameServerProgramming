@@ -132,6 +132,15 @@ void ProcessPacket(char* ptr)
 	}
 	break;
 
+	case SC_LOGIN_FAIL:
+	{
+		//SC_LOGIN_FAIL_PACKET* my_packet = reinterpret_cast<SC_LOGIN_FAIL_PACKET*>(ptr);
+		cout << "로그인 실패\n";
+		exit(-1);
+
+		break;
+	}
+
 	case SC_ADD_PLAYER:
 	{
 		SC_ADD_PLAYER_PACKET * my_packet = reinterpret_cast<SC_ADD_PLAYER_PACKET*>(ptr);
@@ -281,6 +290,17 @@ int main()
 	cout << "Input Client ID : ";
 	cin >> CLIENT_ID;
 
+	//// 입력 id에 공백이 있으면 다시 입력
+	//for (int i = 0; i < sizeof(CLIENT_ID); ++i)	{
+	//	if (CLIENT_ID[i] == ' ') {
+	//		cout << CLIENT_ID<< "ID에 공백이 있습니다. 다시 입력하세요.\n";
+	//		cout << "Input Client ID : ";
+	//		cin >> CLIENT_ID;
+	//		break;
+	//	}
+	//}
+
+
 	wcout.imbue(locale("korean"));
 	//sf::Socket::Status status = s_socket.connect("127.0.0.1", PORT_NUM);
 	sf::Socket::Status status = s_socket.connect(SERVER_IP, PORT_NUM);
@@ -296,8 +316,9 @@ int main()
 	p.size = sizeof(p);
 	p.type = CS_LOGIN;
 
-	string player_name{ "P" };
-	player_name += to_string(GetCurrentProcessId());
+	//string player_name{ "P" };
+	string player_name = CLIENT_ID;
+	//player_name += to_string(GetCurrentProcessId());
 	
 	strcpy_s(p.name, player_name.c_str());
 	send_packet(&p);

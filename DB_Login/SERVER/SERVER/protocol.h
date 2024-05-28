@@ -10,18 +10,26 @@ constexpr int W_HEIGHT = 2000;
 
 // Packet ID
 constexpr char CS_LOGIN = 0;
-constexpr char CS_MOVE = 1;
+constexpr char SC_LOGIN_FAIL = 1;
 
-constexpr char SC_LOGIN_INFO = 2;
-constexpr char SC_ADD_PLAYER = 3;
-constexpr char SC_REMOVE_PLAYER = 4;
-constexpr char SC_MOVE_PLAYER = 5;
+constexpr char CS_MOVE = 2;
+
+constexpr char SC_LOGIN_INFO = 3;
+constexpr char SC_ADD_PLAYER = 4;
+constexpr char SC_REMOVE_PLAYER = 5;
+constexpr char SC_MOVE_PLAYER = 6;
 
 #pragma pack (push, 1)
 struct CS_LOGIN_PACKET {
 	unsigned char size;
 	char	type;
 	char	name[NAME_SIZE];
+};
+
+struct SC_LOGIN_FAIL_PACKET {
+	unsigned char size;
+	char	type;
+	bool 	success;
 };
 
 struct CS_MOVE_PACKET {

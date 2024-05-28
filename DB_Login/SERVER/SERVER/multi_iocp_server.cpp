@@ -7,7 +7,12 @@
 #include <mutex>
 #include <unordered_set>
 #include <queue>
+#include <windows.h>  
+#include <stdio.h>  
 #include "protocol.h"
+
+#define UNICODE  
+#include <sqlext.h>  
 
 #pragma comment(lib, "WS2_32.lib")
 #pragma comment(lib, "MSWSock.lib")
@@ -142,6 +147,13 @@ struct EVENT {
 	}
 };
 
+struct DB_PLAYER {
+	char name[20];
+    int x;
+	int y;
+	bool in_db;
+};
+
 
 priority_queue<EVENT> g_event_queue;
 mutex eql;
@@ -252,34 +264,243 @@ int get_new_client_id()
     return -1;
 }
 
+WCHAR* c2w(const char* cstr) {
+    int size_needed = MultiByteToWideChar(CP_UTF8, 0, cstr, -1, NULL, 0);
+    WCHAR* wstr = new WCHAR[size_needed];
+    MultiByteToWideChar(CP_UTF8, 0, cstr, -1, wstr, size_needed);
+
+
+    return wstr;
+}
+
+DB_PLAYER PlayerInDB( char* p_name )
+{
+    DB_PLAYER data;
+
+    SQLHENV henv;
+    SQLHDBC hdbc;
+    SQLHSTMT hstmt = 0;
+    SQLRETURN retcode;
+    SQLCHAR szName[20];
+    SQLINTEGER sz_cl_x, sz_cl_y;
+    SQLLEN cbName = 0, cb_cl_x = 0, cb_cl_y = 0;
+
+    // Allocate environment handle  
+    retcode = SQLAllocHandle(SQL_HANDLE_ENV, SQL_NULL_HANDLE, &henv);
+
+    // Set the ODBC version environment attribute  
+    if (retcode == SQL_SUCCESS || retcode == SQL_SUCCESS_WITH_INFO) {
+        retcode = SQLSetEnvAttr(henv, SQL_ATTR_ODBC_VERSION, (SQLPOINTER*)SQL_OV_ODBC3, 0);
+
+        // Allocate connection handle  
+        if (retcode == SQL_SUCCESS || retcode == SQL_SUCCESS_WITH_INFO) {
+            retcode = SQLAllocHandle(SQL_HANDLE_DBC, henv, &hdbc);
+
+            // Set login timeout to 5 seconds  
+            if (retcode == SQL_SUCCESS || retcode == SQL_SUCCESS_WITH_INFO) {
+                SQLSetConnectAttr(hdbc, SQL_LOGIN_TIMEOUT, (SQLPOINTER)5, 0);
+
+                // Connect to data source  
+                retcode = SQLConnect(hdbc, (SQLWCHAR*)L"2024_DB", SQL_NTS, (SQLWCHAR*)NULL, 0, NULL, 0);
+
+                // Allocate statement handle  
+                if (retcode == SQL_SUCCESS || retcode == SQL_SUCCESS_WITH_INFO) {
+                    retcode = SQLAllocHandle(SQL_HANDLE_STMT, hdbc, &hstmt);
+
+                    retcode = SQLExecDirect(hstmt, (SQLWCHAR*)L"SELECT cl_id, cl_x, cl_y FROM cl_table", SQL_NTS);
+                    if (retcode == SQL_SUCCESS || retcode == SQL_SUCCESS_WITH_INFO) {
+
+                        // Bind columns 1, 2, and 3  
+                        retcode = SQLBindCol(hstmt, 1, SQL_C_WCHAR, szName, 20, &cbName);
+                        retcode = SQLBindCol(hstmt, 2, SQL_C_LONG, &sz_cl_x, 10, &cb_cl_x);
+                        retcode = SQLBindCol(hstmt, 3, SQL_C_LONG, &sz_cl_y, 10, &cb_cl_y);
+
+                        // Fetch and print each row of data. On an error, display a message and exit.  
+                        for (int i = 0; ; i++) {
+                            retcode = SQLFetch(hstmt);
+                            if (retcode == SQL_ERROR /*|| retcode == SQL_SUCCESS_WITH_INFO*/)
+                                printf("error\n");
+
+                            if (retcode == SQL_SUCCESS || retcode == SQL_SUCCESS_WITH_INFO)
+                            {
+                                //replace wprintf with printf
+                                // p->name가 szName과 같으면 로그인 성공
+                                //char* db_name = reinterpret_cast<char*>(szName);
+                                WCHAR name[20];
+                                lstrcpy(name, (WCHAR*)szName);  //  name에 szName을 복사
+                                //printf("%ls\n", name);
+
+                                // name 공백 제거
+                                for (int i = 0; i < 20; i++) {
+                                    if (name[i] == ' ') {
+                                        name[i] = '\0';
+                                        break;
+                                    }
+                                }
+
+                                //  name과 p->name이 같은지 확인
+                                if (lstrcmp(name, c2w(p_name)) == 0) {
+                                    //printf("%d: %ls %3d %3d\n", i + 1, szName, sz_cl_x, sz_cl_y);
+									data.in_db = true;
+									data.x = sz_cl_x;
+									data.y = sz_cl_y;
+									strcpy_s(data.name, p_name);
+									break;
+
+								}
+								else 	
+                                    data.in_db = false;
+                            }
+                            else
+                                break;
+                        }
+                    }
+
+                    // Process data  
+                    if (retcode == SQL_SUCCESS || retcode == SQL_SUCCESS_WITH_INFO) {
+                        SQLCancel(hstmt);
+                        SQLFreeHandle(SQL_HANDLE_STMT, hstmt);
+                    }
+
+                    SQLDisconnect(hdbc);
+                }
+
+                SQLFreeHandle(SQL_HANDLE_DBC, hdbc);
+            }
+        }
+        SQLFreeHandle(SQL_HANDLE_ENV, henv);
+    }
+    
+    return data;
+}
+
+void SetDB(char* p_name, int x, int y)
+{
+    DB_PLAYER data;
+
+    SQLHENV henv;
+    SQLHDBC hdbc;
+    SQLHSTMT hstmt = 0;
+    SQLRETURN retcode;
+    SQLCHAR szName[20];
+    SQLINTEGER sz_cl_x, sz_cl_y;
+    SQLLEN cbName = 0, cb_cl_x = 0, cb_cl_y = 0;
+
+    // Allocate environment handle  
+    retcode = SQLAllocHandle(SQL_HANDLE_ENV, SQL_NULL_HANDLE, &henv);
+
+    // Set the ODBC version environment attribute  
+    if (retcode == SQL_SUCCESS || retcode == SQL_SUCCESS_WITH_INFO) {
+        retcode = SQLSetEnvAttr(henv, SQL_ATTR_ODBC_VERSION, (SQLPOINTER*)SQL_OV_ODBC3, 0);
+
+        // Allocate connection handle  
+        if (retcode == SQL_SUCCESS || retcode == SQL_SUCCESS_WITH_INFO) {
+            retcode = SQLAllocHandle(SQL_HANDLE_DBC, henv, &hdbc);
+
+            // Set login timeout to 5 seconds  
+            if (retcode == SQL_SUCCESS || retcode == SQL_SUCCESS_WITH_INFO) {
+                SQLSetConnectAttr(hdbc, SQL_LOGIN_TIMEOUT, (SQLPOINTER)5, 0);
+
+                // Connect to data source  
+                retcode = SQLConnect(hdbc, (SQLWCHAR*)L"2024_DB", SQL_NTS, (SQLWCHAR*)NULL, 0, NULL, 0);
+
+                // Allocate statement handle  
+                if (retcode == SQL_SUCCESS || retcode == SQL_SUCCESS_WITH_INFO) {
+                    retcode = SQLAllocHandle(SQL_HANDLE_STMT, hdbc, &hstmt);
+
+					wstring query = L"UPDATE cl_table SET cl_x = " + to_wstring(x) + L", cl_y = " + to_wstring(y) + L" WHERE cl_id = '" + c2w(p_name) + L"'";
+
+                    retcode = SQLExecDirect(hstmt, (SQLWCHAR*)query.c_str(), SQL_NTS);
+                    if (retcode == SQL_SUCCESS || retcode == SQL_SUCCESS_WITH_INFO) {
+
+                        // Bind columns 1, 2, and 3  
+                        retcode = SQLBindCol(hstmt, 1, SQL_C_WCHAR, szName, 20, &cbName);
+                        retcode = SQLBindCol(hstmt, 2, SQL_C_LONG, &sz_cl_x, 10, &cb_cl_x);
+                        retcode = SQLBindCol(hstmt, 3, SQL_C_LONG, &sz_cl_y, 10, &cb_cl_y);
+
+                        // Fetch and print each row of data. On an error, display a message and exit.  
+                        for (int i = 0; ; i++) {
+                            retcode = SQLFetch(hstmt);
+                            if (retcode == SQL_ERROR /*|| retcode == SQL_SUCCESS_WITH_INFO*/)
+                                printf("error\n");
+
+                            if (retcode == SQL_SUCCESS || retcode == SQL_SUCCESS_WITH_INFO)
+                            {
+                                //replace wprintf with printf
+                                // p->name가 szName과 같으면 로그인 성공
+                                //char* db_name = reinterpret_cast<char*>(szName);
+                                WCHAR name[20];
+                                lstrcpy(name, (WCHAR*)szName);  //  name에 szName을 복사
+                                //printf("%ls\n", name);
+
+
+
+                                
+                            }
+                            else
+                                break;
+                        }
+                    }
+
+                    // Process data  
+                    if (retcode == SQL_SUCCESS || retcode == SQL_SUCCESS_WITH_INFO) {
+                        SQLCancel(hstmt);
+                        SQLFreeHandle(SQL_HANDLE_STMT, hstmt);
+                    }
+
+                    SQLDisconnect(hdbc);
+                }
+
+                SQLFreeHandle(SQL_HANDLE_DBC, hdbc);
+            }
+        }
+        SQLFreeHandle(SQL_HANDLE_ENV, henv);
+    }
+
+}
+
 void process_packet(int c_id, char* packet)
 {
     switch (packet[1]) {
     case CS_LOGIN: {
-
         CS_LOGIN_PACKET* p = reinterpret_cast<CS_LOGIN_PACKET*>(packet);
 
+		//cout << p->name << " is connected\n";
 
+		// 클라이언트의 아이디를 DB에서 확인하고, 성공하면 로그인 성공 패킷을 보내고, 실패하면 로그인 실패 패킷을 보낸다.
+        // 1. DB에서 아이디 검색
+        DB_PLAYER db_data = PlayerInDB(p->name);
+		if(db_data.in_db == true)
+        {   // 2. 성공하면 로그인 성공 패킷 전송
+            strcpy_s(objects[c_id]._name, db_data.name);
 
-        strcpy_s(objects[c_id]._name, p->name);
-        objects[c_id].x = rand() % W_WIDTH;
-        objects[c_id].y = rand() % W_HEIGHT;
-        objects[c_id].send_login_info_packet();
-        {
-            lock_guard<mutex> ll{ objects[c_id]._s_lock };
-            objects[c_id]._state = ST_INGAME;
-        }
-
-        for (auto& pl : objects) {
+            objects[c_id].x = db_data.x;
+            objects[c_id].y = db_data.y;
+            objects[c_id].send_login_info_packet();
             {
-                lock_guard<mutex> ll(pl._s_lock);
-                if (ST_INGAME != pl._state) continue;
+                lock_guard<mutex> ll{ objects[c_id]._s_lock };
+                objects[c_id]._state = ST_INGAME;
             }
-            if (pl._id == c_id) continue;
-            if (false == can_see(pl._id, c_id)) continue;
-            pl.send_add_object_packet(c_id);
-            objects[c_id].send_add_object_packet(pl._id);
+
+            for (auto& pl : objects) {
+                {
+                    lock_guard<mutex> ll(pl._s_lock);
+                    if (ST_INGAME != pl._state) continue;
+                }
+                if (pl._id == c_id) continue;
+                if (false == can_see(pl._id, c_id)) continue;
+                pl.send_add_object_packet(c_id);
+                objects[c_id].send_add_object_packet(pl._id);
+            }
         }
+        else
+        {  // 3. 실패하면 로그인 실패 패킷 전송
+			SC_LOGIN_FAIL_PACKET p;
+			p.size = sizeof(SC_LOGIN_FAIL_PACKET);
+			p.type = SC_LOGIN_FAIL;
+			objects[c_id].do_send(&p);
+        }
+
         break;
     }
 	case CS_MOVE: { // NPC도 이동 패킷을 받을 수 있음
@@ -347,6 +568,8 @@ void disconnect(int c_id)
     }
     closesocket(objects[c_id]._socket);
 
+	SetDB(objects[c_id]._name, objects[c_id].x, objects[c_id].y);
+
     lock_guard<mutex> ll(objects[c_id]._s_lock);
     objects[c_id]._state = ST_FREE;
 }
@@ -373,7 +596,7 @@ void worker_thread(HANDLE h_iocp)
         if (FALSE == ret) {
             if (ex_over->_comp_type == OP_ACCEPT) cout << "Accept Error";
             else {
-                cout << "GQCS Error on client[" << key << "]\n";
+                cout << "GQCS Error on client[" << key << "]\n";                  
                 disconnect(static_cast<int>(key));
                 if (ex_over->_comp_type == OP_SEND) delete ex_over;
                 continue;
